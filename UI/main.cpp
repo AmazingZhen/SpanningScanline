@@ -1,10 +1,10 @@
-#include "MeshViewer.h"
+#include "ModelDisplayer.h"
 #include <QtWidgets/QApplication>
 
 int main(int argc, char *argv[])
 {
 	QApplication a(argc, argv);
-	MeshViewer w;
+	SpanningScanline::ModelDisplayer w;
 	w.show();
 	return a.exec();
 }

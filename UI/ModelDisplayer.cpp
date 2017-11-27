@@ -1,5 +1,5 @@
-#include "MeshViewer.h"
-
+#include "ModelDisplayer.h"
+#include <iostream>
 #include <QtWidgets>
 #if defined(QT_PRINTSUPPORT_LIB)
 #include <QtPrintSupport/qtprintsupportglobal.h>
@@ -8,11 +8,15 @@
 #endif
 #endif
 
-MeshViewer::MeshViewer(QWidget *parent)
+using SpanningScanline::ModelDisplayer;
+
+ModelDisplayer::ModelDisplayer(QWidget *parent)
 	: QMainWindow(parent),
 	imageLabel(new QLabel),
 	scrollArea(new QScrollArea),
-	scaleFactor(1)
+	scaleFactor(1),
+	loader(true),
+	render()
 {
 	ui.setupUi(this);
 
@@ -28,20 +32,24 @@ MeshViewer::MeshViewer(QWidget *parent)
 	createActions();
 
 	resize(QGuiApplication::primaryScreen()->availableSize() * 3 / 5);
+
+	typeFilter += "(";
+	typeFilter += loader.getSupportedTypes();
+	typeFilter += ");;All Files (*)";
 }
 
-void MeshViewer::createActions()
+void ModelDisplayer::createActions()
 {
 	QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
 
-	QAction *openAct = fileMenu->addAction(tr("&Open..."), this, &MeshViewer::openImage);
+	QAction *openAct = fileMenu->addAction(tr("&Open..."), this, &ModelDisplayer::open);
 }
 
-void MeshViewer::updateActions()
+void ModelDisplayer::updateActions()
 {
 }
 
-void MeshViewer::setImage(const QImage & newImage)
+void ModelDisplayer::setImage(const QImage & newImage)
 {
 	image = newImage;
 	imageLabel->setPixmap(QPixmap::fromImage(image));
@@ -75,11 +83,27 @@ static void initializeImageFileDialog(QFileDialog &dialog, QFileDialog::AcceptMo
 		dialog.setDefaultSuffix("jpg");
 }
 
-void MeshViewer::open() {
+void ModelDisplayer::open() {
+	QString fileName = QFileDialog::getOpenFileName(this,
+		tr("Open Model"), "",
+		tr(typeFilter.c_str()));
 
+	if (!fileName.isEmpty()) {
+		bool loaded = loader.load(fileName, ModelLoader::PathType::AbsolutePath);
+		qDebug() << loaded;
+
+		if (loaded) {
+			QVector<float> *vertices;
+			QVector<float> *normals;
+			QVector<unsigned int> *indices;
+
+			loader.getBufferData(&vertices, &normals, &indices);
+			render.setBufferData(*vertices, *normals, *indices);
+		}
+	}
 }
 
-void MeshViewer::openImage()
+void ModelDisplayer::openImage()
 {
 	QFileDialog dialog(this, tr("Open File"));
 	initializeImageFileDialog(dialog, QFileDialog::AcceptOpen);
@@ -87,7 +111,7 @@ void MeshViewer::openImage()
 	while (dialog.exec() == QDialog::Accepted && !loadImageFile(dialog.selectedFiles().first())) {}
 }
 
-bool MeshViewer::loadImageFile(const QString &fileName)
+bool ModelDisplayer::loadImageFile(const QString &fileName)
 {
 	QImageReader reader(fileName);
 	reader.setAutoTransform(true);

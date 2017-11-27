@@ -41,38 +41,56 @@
       <UniqueIdentifier>{99349809-55BA-4b9d-BF79-8FDBB0286EB3}</UniqueIdentifier>
       <Extensions>ui</Extensions>
     </Filter>
+    <Filter Include="Loader">
+      <UniqueIdentifier>{f2c305c3-608a-4964-8c5d-3fd297b261fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Render">
+      <UniqueIdentifier>{4b5ad39c-be36-49b1-8be7-9d925b7d92b1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="UI\main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="GeneratedFiles\Debug\moc_MeshViewer.cpp">
+    <ClCompile Include="GeneratedFiles\Debug\moc_ModelDisplayer.cpp">
       <Filter>UI\Generated Files\Debug</Filter>
     </ClCompile>
-    <ClCompile Include="GeneratedFiles\Release\moc_MeshViewer.cpp">
+    <ClCompile Include="GeneratedFiles\Release\moc_ModelDisplayer.cpp">
       <Filter>UI\Generated Files\Release</Filter>
     </ClCompile>
-    <ClCompile Include="GeneratedFiles\qrc_MeshViewer.cpp">
+    <ClCompile Include="UI\ModelDisplayer.cpp">
+      <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="GeneratedFiles\qrc_ModelDisplayer.cpp">
       <Filter>UI\Generated Files</Filter>
     </ClCompile>
-    <ClCompile Include="UI\MeshViewer.cpp">
+    <ClCompile Include="Loader\ModelLoader.cpp">
+      <Filter>Loader</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\main.cpp">
       <Filter>UI</Filter>
+    </ClCompile>
+    <ClCompile Include="Render\ModelRender.cpp">
+      <Filter>Render</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="UI\MeshViewer.ui">
-      <Filter>UI\Form Files</Filter>
+    <CustomBuild Include="UI\ModelDisplayer.h">
+      <Filter>UI</Filter>
     </CustomBuild>
-    <CustomBuild Include="UI\MeshViewer.qrc">
+    <CustomBuild Include="UI\ModelDisplayer.qrc">
       <Filter>UI\Resource Files</Filter>
     </CustomBuild>
-    <CustomBuild Include="UI\MeshViewer.h">
-      <Filter>UI</Filter>
+    <CustomBuild Include="UI\ModelDisplayer.ui">
+      <Filter>UI\Form Files</Filter>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="GeneratedFiles\ui_MeshViewer.h">
+    <ClInclude Include="GeneratedFiles\ui_ModelDisplayer.h">
       <Filter>UI\Generated Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Loader\ModelLoader.h">
+      <Filter>Loader</Filter>
+    </ClInclude>
+    <ClInclude Include="Render\ModelRender.h">
+      <Filter>Render</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

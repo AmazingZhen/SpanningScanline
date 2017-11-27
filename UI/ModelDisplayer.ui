@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>MeshViewerClass</class>
- <widget class="QMainWindow" name="MeshViewerClass">
+ <class>ModelDisplayerClass</class>
+ <widget class="QMainWindow" name="ModelDisplayerClass">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MeshViewer</string>
+   <string>ModelDisplayer</string>
   </property>
   <widget class="QWidget" name="centralWidget"/>
   <widget class="QMenuBar" name="menuBar">
@@ -28,7 +28,7 @@
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources>
-  <include location="MeshViewer.qrc"/>
+  <include location="ModelDisplayer.qrc"/>
  </resources>
  <connections/>
 </ui>
