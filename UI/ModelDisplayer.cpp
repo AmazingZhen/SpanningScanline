@@ -15,8 +15,11 @@ ModelDisplayer::ModelDisplayer(QWidget *parent)
 	imageLabel(new QLabel),
 	scrollArea(new QScrollArea),
 	scaleFactor(1),
-	loader(true),
-	render()
+	loader(false),
+	m_width(600),
+	m_height(600),
+	camera_pos(0.f, 0.f, 2.f),
+	render(qRgb(0, 0, 0))
 {
 	ui.setupUi(this);
 
@@ -31,11 +34,14 @@ ModelDisplayer::ModelDisplayer(QWidget *parent)
 
 	createActions();
 
-	resize(QGuiApplication::primaryScreen()->availableSize() * 3 / 5);
+	resize(QSize(600, 600));
 
 	typeFilter += "(";
 	typeFilter += loader.getSupportedTypes();
 	typeFilter += ");;All Files (*)";
+
+	render.setCameraPos(camera_pos);
+	render.setWindowSize(m_width, m_height);
 }
 
 void ModelDisplayer::createActions()
@@ -98,7 +104,10 @@ void ModelDisplayer::open() {
 			QVector<unsigned int> *indices;
 
 			loader.getBufferData(&vertices, &normals, &indices);
+
 			render.setBufferData(*vertices, *normals, *indices);
+			render.render();
+			setImage(render.getRenderResult());
 		}
 	}
 }
@@ -132,6 +141,37 @@ bool ModelDisplayer::loadImageFile(const QString &fileName)
 	statusBar()->showMessage(message);
 
 	return true;
+}
+
+void SpanningScanline::ModelDisplayer::keyPressEvent(QKeyEvent *event)
+{
+	bool specific_key_pressed = true;
+	switch (event->key())
+	{
+	case Qt::Key_W:
+		camera_pos.setY(camera_pos.y() + 0.5f);
+		break;
+	case Qt::Key_S:
+		camera_pos.setY(camera_pos.y() - 0.5f);
+		break;
+	case Qt::Key_A:
+		camera_pos.setX(camera_pos.x() - 0.5f);
+		break;
+	case Qt::Key_D:
+		camera_pos.setX(camera_pos.x() + 0.5f);
+		break;
+	default:
+		printf("aa");
+		false;
+		break;
+	}
+
+	if (specific_key_pressed) {
+		qDebug() << camera_pos << endl;
+		render.setCameraPos(camera_pos);
+		render.render();
+		setImage(render.getRenderResult());
+	}
 }
 
 

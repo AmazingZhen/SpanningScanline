@@ -5,6 +5,11 @@
 #include <QDebug>
 #include <limits>
 
+using SpanningScanline::MaterialInfo;
+using SpanningScanline::LightInfo;
+using SpanningScanline::Mesh;
+using SpanningScanline::Node;
+
 using SpanningScanline::ModelLoader;
 
 #define DEBUGOUTPUT_NORMALS(nodeIndex) (false)//( QList<int>{1}.contains(nodeIndex) )//(false)

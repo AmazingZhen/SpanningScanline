@@ -34,6 +34,8 @@ namespace SpanningScanline {
 
 		bool loadImageFile(const QString & fileName);
 
+		void keyPressEvent(QKeyEvent *event);
+
 		QImage image;
 		QLabel *imageLabel;
 		QScrollArea *scrollArea;
@@ -46,6 +48,9 @@ namespace SpanningScanline {
 		ModelLoader loader;
 
 		// Render
+		int m_width, m_height;
 		ModelRender render;
+
+		QVector3D camera_pos;
 	};
 }
