@@ -10,16 +10,17 @@ using namespace std;
 
 namespace SpanningScanline {
 	struct Polygon {
+		unsigned int id;
+
 		float a, b, c;  // Normal vector of the polygon n = (a, b, c)
 		// double d;	// ax + by + cz + d = 0
 		int cross_y;	// The number of scanlines crossed by the polygon
-		// Color color;
-		unsigned int id;
+		QRgb color;
 	};
 
 	struct Side {
 		unsigned int polygon_id;
-		float delta_x;		// dy / dx = k, dx / dy = 1 / k
+		float delta_x;		// dy / dx = k, delta_x = -1 / k
 		int cross_y;		// The number of scanlines crossed by the side
 		float x;				// the x value of point y_max
 		float z;			// the z value of point y_max
@@ -34,6 +35,8 @@ namespace SpanningScanline {
 	};
 
 	struct SidePair {
+		int polygon_id;
+
 		// 'left' side of polygon cross scanline
 		float x_l;			// x value of intersection
 		float dx_l;			// delta_x
@@ -46,7 +49,7 @@ namespace SpanningScanline {
 		float dz_l_along_x;	// delta_z along x axis, dz / dx
 		float dz_r_along_y;	// delta_z along y axis, dz / dy
 
-		int polygon_id;
+		QRgb color;  // used for light
 
 		void print() {
 			cout << "x_l :"			<< x_l << endl;
@@ -75,8 +78,9 @@ namespace SpanningScanline {
 	private:
 		// Initial data structure of scanline algorithm.
 		bool initialPolygonTableAndSideTable();
-		QVector3D getProjectVertexFromBuffer(int index);
-		bool addPolygon(const QVector3D &a, const QVector3D &b, const QVector3D &c, int polygon_id);
+		QVector3D getVertexFromBuffer(int index);
+		QVector3D getNormalFromBuffer(int index);
+		bool addPolygon(const QVector3D &a, const QVector3D &b, const QVector3D &c, float factor, int polygon_id);
 		bool addSides(const QVector3D &a, const QVector3D &b, const QVector3D &c, int polygon_id);
 		bool addSide(const QVector3D &a, const QVector3D &b, int polygon_id);
 

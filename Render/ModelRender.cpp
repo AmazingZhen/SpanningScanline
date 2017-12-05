@@ -2,7 +2,7 @@
 
 SpanningScanline::ModelRender::ModelRender(QRgb backgroundColor) :
 	m_backgroundColor(backgroundColor),
-	m_min_z(-100.f)
+	m_min_z(-1000.f)
 {
 }
 
@@ -39,7 +39,6 @@ void SpanningScanline::ModelRender::setCameraPos(QVector3D pos)
 {
 	m_modelview = QMatrix4x4();
 	m_modelview.lookAt(pos, QVector3D(0.f, 0.f, 0.f), QVector3D(0.f, 1.f, 0.f));
-	qDebug() << m_modelview;
 }
 
 void SpanningScanline::ModelRender::setWindowSize(int width, int height)
@@ -70,17 +69,42 @@ bool SpanningScanline::ModelRender::initialPolygonTableAndSideTable()
 	m_activeSidePairTable.clear();
 
 	QVector3D a, b, c;
+	QVector3D a_normal, b_normal, c_normal, origin_polygon_normal;
+	QVector3D a_project, b_project, c_project;
+	QVector3D forward = QVector3D(m_modelview.row(2)[0], m_modelview.row(2)[1], m_modelview.row(2)[2]).normalized();
+	float factor = 0.f;
 	int count = 0;
 
 	for (int i = 0; i < m_indices.size(); i += 3) {
 		//printf("Face %d:\n", i / 3);
+		
+		a = getVertexFromBuffer(m_indices[i]);
+		b = getVertexFromBuffer(m_indices[i + 1]);
+		c = getVertexFromBuffer(m_indices[i + 2]);
+		
+		a_normal = getNormalFromBuffer(m_indices[i]);
+		b_normal = getNormalFromBuffer(m_indices[i + 1]);
+		c_normal = getNormalFromBuffer(m_indices[i + 2]);
 
-		a = getProjectVertexFromBuffer(m_indices[i]);
-		b = getProjectVertexFromBuffer(m_indices[i + 1]);
-		c = getProjectVertexFromBuffer(m_indices[i + 2]);
+		// Get color factor by normal * forward
+		origin_polygon_normal = ((a_normal + b_normal + c_normal) / 3).normalized();
+		factor = QVector3D::dotProduct(origin_polygon_normal, forward);
+		if (factor <= 0.f) {
+			continue;
+		}
+		/*
+		printf("%d\n", count);
+		qDebug() << origin_polygon_normal;
+		qDebug() << forward;
+		printf("%f\n\n", factor);
+		*/
 
-		if (addPolygon(a, b, c, count)) {
-			addSides(a, b, c, count);
+		a_project = a.project(m_modelview, m_projection, m_viewport);
+		b_project = b.project(m_modelview, m_projection, m_viewport);
+		c_project = c.project(m_modelview, m_projection, m_viewport);
+
+		if (addPolygon(a_project, b_project, c_project, factor, count)) {
+			addSides(a_project, b_project, c_project, count);
 
 			count++;
 		}
@@ -91,19 +115,21 @@ bool SpanningScanline::ModelRender::initialPolygonTableAndSideTable()
 	return true;
 }
 
-QVector3D SpanningScanline::ModelRender::getProjectVertexFromBuffer(int index)
+QVector3D SpanningScanline::ModelRender::getVertexFromBuffer(int index)
 {
-	//printf("Vertex: %d\n", index);
 	int true_index = index * 3;
-
 	QVector3D vertex(m_vertices[true_index], m_vertices[true_index + 1], m_vertices[true_index + 2]);
-	vertex = vertex.project(m_modelview, m_projection, m_viewport);
-	//printf("%f, %f, %f\n", vertex.x(), vertex.y(), vertex.z());
-
 	return vertex;
 }
 
-bool SpanningScanline::ModelRender::addPolygon(const QVector3D & a, const QVector3D & b, const QVector3D & c, int count)
+QVector3D SpanningScanline::ModelRender::getNormalFromBuffer(int index)
+{
+	int true_index = index * 3;
+	QVector3D normal(m_normals[true_index], m_normals[true_index + 1], m_normals[true_index + 2]);
+	return normal;
+}
+
+bool SpanningScanline::ModelRender::addPolygon(const QVector3D & a, const QVector3D & b, const QVector3D & c, float factor, int count)
 {
 	int maxY = (int)std::max(std::max(a.y(), b.y()), c.y());
 	int minY = (int)std::min(std::min(a.y(), b.y()), c.y());
@@ -117,11 +143,13 @@ bool SpanningScanline::ModelRender::addPolygon(const QVector3D & a, const QVecto
 
 		// Add to polygon table
 		Polygon p;
+		p.id = count;
 		p.a = normal.x();
 		p.b = normal.y();
 		p.c = normal.z();
 		p.cross_y = maxY - minY;
-		p.id = count;
+
+		p.color = qRgb(factor * 255, factor * 255, factor * 255);
 
 		m_polygonTable[maxY].push_back(p);
 	}
@@ -141,7 +169,7 @@ bool SpanningScanline::ModelRender::addSides(const QVector3D & a, const QVector3
 	return true;
 }
 
-bool SpanningScanline::ModelRender::addSide(const QVector3D & a, const QVector3D & b, int polygon_id)
+bool SpanningScanline::ModelRender::addSide(const QVector3D &a, const QVector3D &b, int polygon_id)
 {
 	if (std::abs(a.y() - b.y()) < 0.2f) {  // ignore side parallel to scanline
 		return false;
@@ -273,6 +301,8 @@ bool SpanningScanline::ModelRender::activeSidePair(const Side &a, const Side &b,
 	sidePair.dx_r = right.delta_x;
 	sidePair.cross_y_r = right.cross_y;
 
+	sidePair.color = p.color;
+
 	// ax + by + cz + d = 0
 	// dz / dx = -a / c, dz / dy = -b / c
 	if (p.c == 0) {
@@ -293,6 +323,8 @@ void SpanningScanline::ModelRender::scan(int line)
 	if (m_activeSidePairTable.isEmpty()) {
 		return;
 	}
+	
+	//QVector3D view = (m_projection * QVector4D(m_modelview.row(2)[0], m_modelview.row(2)[1], m_modelview.row(2)[2], 0.f)).toVector3D().normalized();
 
 	//printf("curline: %d\n", line);
 
@@ -302,33 +334,33 @@ void SpanningScanline::ModelRender::scan(int line)
 		SidePair &sp = *sp_iter;	
 
 		/*
-		if (sp.polygon_id != 2) {
+		if (sp.polygon_id != 9) {
 			sp_iter++;
 			continue;
 		}
 		//*/
 
 		float cur_z = sp.z_l;
+		//float factor = std::abs(QVector4D::dotProduct(view, sp.normal));
+		//int gray = 255 * factor;
+		//qDebug() << sp.normal;
+		//printf("factor: %f\n", factor);
 
 		for (int x = sp.x_l; x <= sp.x_r; x++) {
-			if (x == 0) {
-				printf("aaa");
-			}
-
 			if (x < 0 || x >= m_width) {
 				break;
 			}
 
-			//m_frame_buffer[line][x] = (x < sp.x_r - 2 && x > sp.x_l + 2) ? m_backgroundColor : qRgb(255, 255, 255);
-			///*
 			if (cur_z > m_z_buffer[x]) {
 				m_z_buffer[x] = cur_z;
 
 				// Color  TO DO ...
 				//m_frame_buffer[line][x] = (x < sp.x_r + 1 && x > sp.x_l + 1) ? m_backgroundColor : qRgb(255, 255, 255);
-				m_frame_buffer[line][x] = qRgb(255, 255, 255);
+				m_frame_buffer[line][x] = sp.color;
+				// m_frame_buffer[line][x] = qRgb(255, 255, 255);
+
+				//m_frame_buffer[line][x] = qRgb(gray, gray, gray);
 			}
-			//*/
 
 			cur_z += sp.dz_l_along_x;
 		}

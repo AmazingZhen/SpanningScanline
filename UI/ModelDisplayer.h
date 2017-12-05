@@ -51,6 +51,7 @@ namespace SpanningScanline {
 		int m_width, m_height;
 		ModelRender render;
 
-		QVector3D camera_pos;
+		QVector4D m_camera_pos;
+		float m_x_angle, m_y_angle;
 	};
 }

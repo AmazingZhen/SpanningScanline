@@ -18,8 +18,10 @@ ModelDisplayer::ModelDisplayer(QWidget *parent)
 	loader(false),
 	m_width(600),
 	m_height(600),
-	camera_pos(0.f, 0.f, 2.f),
-	render(qRgb(0, 0, 0))
+	render(qRgb(0, 0, 0)),
+	m_camera_pos(0.f, 0.f, 2.f, 1.f),
+	m_x_angle(0.f),
+	m_y_angle(0.f)
 {
 	ui.setupUi(this);
 
@@ -40,7 +42,7 @@ ModelDisplayer::ModelDisplayer(QWidget *parent)
 	typeFilter += loader.getSupportedTypes();
 	typeFilter += ");;All Files (*)";
 
-	render.setCameraPos(camera_pos);
+	render.setCameraPos(m_camera_pos.toVector3D());
 	render.setWindowSize(m_width, m_height);
 }
 
@@ -146,29 +148,35 @@ bool ModelDisplayer::loadImageFile(const QString &fileName)
 void SpanningScanline::ModelDisplayer::keyPressEvent(QKeyEvent *event)
 {
 	bool specific_key_pressed = true;
+
 	switch (event->key())
 	{
 	case Qt::Key_W:
-		camera_pos.setY(camera_pos.y() + 0.5f);
+		m_x_angle += 3.f;
 		break;
 	case Qt::Key_S:
-		camera_pos.setY(camera_pos.y() - 0.5f);
+		m_x_angle -= 3.f;
 		break;
 	case Qt::Key_A:
-		camera_pos.setX(camera_pos.x() - 0.5f);
+		m_y_angle += 3.f;
 		break;
 	case Qt::Key_D:
-		camera_pos.setX(camera_pos.x() + 0.5f);
+		m_y_angle -= 3.f;
 		break;
 	default:
-		printf("aa");
-		false;
+		specific_key_pressed = false;
 		break;
 	}
 
 	if (specific_key_pressed) {
-		qDebug() << camera_pos << endl;
-		render.setCameraPos(camera_pos);
+		QMatrix4x4 rot;
+		rot.rotate(m_x_angle, QVector3D(1.f, 0.f, 0.f));
+		rot.rotate(m_y_angle, QVector3D(0.f, 1.f, 0.f));
+		rot.rotate(0.f, QVector3D(0.f, 0.f, 1.f));
+		QVector3D camera_pos_rotated = (rot * m_camera_pos).toVector3D();
+		//qDebug() << camera_pos_rotated;
+
+		render.setCameraPos(camera_pos_rotated);
 		render.render();
 		setImage(render.getRenderResult());
 	}
