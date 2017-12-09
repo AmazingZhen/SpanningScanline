@@ -46,8 +46,8 @@ namespace SpanningScanline {
 		float x_r, dx_r, cross_y_r;
 
 		float z_l;			// z value of intersection
-		float dz_l_along_x;	// delta_z along x axis, dz / dx
-		float dz_r_along_y;	// delta_z along y axis, dz / dy
+		float dz_along_x;	// delta_z along x axis, dz / dx
+		float dz_along_y;	// delta_z along y axis, dz / dy
 
 		QRgb color;  // used for light
 
@@ -59,8 +59,8 @@ namespace SpanningScanline {
 			cout << "dx_r :"		<< dx_r << endl;
 			cout << "cross_y_r :"	<< cross_y_r << endl;
 			cout << "z_l :"			<< z_l << endl;
-			cout << "dz_l_along_x :" << dz_l_along_x << endl;
-			cout << "dz_r_along_y :" << dz_r_along_y << endl << endl;
+			cout << "dz_l_along_x :" << dz_along_x << endl;
+			cout << "dz_r_along_y :" << dz_along_y << endl << endl;
 		}
 	};
 
@@ -72,8 +72,12 @@ namespace SpanningScanline {
 		void render();
 		QImage getRenderResult();
 
-		void setCameraPos(QVector3D pos);
+		void setCameraPos(const QVector3D &pos);
 		void setWindowSize(int width, int height);
+
+		int m_curPolygonId = 0;
+		bool singlePolygon = false;
+		void switchPolygon(bool up);
 
 	private:
 		// Initial data structure of scanline algorithm.
@@ -100,7 +104,7 @@ namespace SpanningScanline {
 		int m_width;
 		int m_height;
 		QRgb m_backgroundColor;
-		float m_min_z;
+		float m_max_z;
 
 		// Data structure of scanline algorithm.
 		QVector<QVector<Polygon>> m_polygonTable;
@@ -116,6 +120,7 @@ namespace SpanningScanline {
 		QVector<unsigned int> m_indices;
 
 		// Matrics for render.
+		QVector3D m_camera_pos;
 		QMatrix4x4 m_modelview;
 		QMatrix4x4 m_projection;
 		QRect m_viewport;

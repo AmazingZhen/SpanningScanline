@@ -19,9 +19,9 @@ ModelDisplayer::ModelDisplayer(QWidget *parent)
 	m_width(600),
 	m_height(600),
 	render(qRgb(0, 0, 0)),
-	m_camera_pos(0.f, 0.f, 2.f, 1.f),
-	m_x_angle(0.f),
-	m_y_angle(0.f)
+	m_camera_pos(0.f, 0.f, 5.f, 1.f),
+	m_x_angle(0),
+	m_y_angle(0)
 {
 	ui.setupUi(this);
 
@@ -147,39 +147,77 @@ bool ModelDisplayer::loadImageFile(const QString &fileName)
 
 void SpanningScanline::ModelDisplayer::keyPressEvent(QKeyEvent *event)
 {
+	bool rotate_camera = false;
 	bool specific_key_pressed = true;
 
 	switch (event->key())
 	{
 	case Qt::Key_W:
-		m_x_angle += 3.f;
+		m_x_angle += 3;
+		rotate_camera = true;
 		break;
 	case Qt::Key_S:
-		m_x_angle -= 3.f;
+		m_x_angle -= 3;
+		rotate_camera = true;
 		break;
 	case Qt::Key_A:
-		m_y_angle += 3.f;
+		m_y_angle += 3;
+		rotate_camera = true;
 		break;
 	case Qt::Key_D:
-		m_y_angle -= 3.f;
+		m_y_angle -= 3;
+		rotate_camera = true;
+		break;
+	case Qt::Key_Q:
+		render.switchPolygon(true);
+		break;
+	case Qt::Key_E:
+		render.switchPolygon(false);
+		break;
+	case Qt::Key_Space:
+		render.singlePolygon = !render.singlePolygon;
 		break;
 	default:
 		specific_key_pressed = false;
 		break;
 	}
 
-	if (specific_key_pressed) {
+	if (rotate_camera) {
 		QMatrix4x4 rot;
 		rot.rotate(m_x_angle, QVector3D(1.f, 0.f, 0.f));
 		rot.rotate(m_y_angle, QVector3D(0.f, 1.f, 0.f));
-		rot.rotate(0.f, QVector3D(0.f, 0.f, 1.f));
 		QVector3D camera_pos_rotated = (rot * m_camera_pos).toVector3D();
-		//qDebug() << camera_pos_rotated;
 
 		render.setCameraPos(camera_pos_rotated);
+	}
+
+	if (specific_key_pressed) {
 		render.render();
 		setImage(render.getRenderResult());
 	}
+
+	event->accept();
+}
+
+void SpanningScanline::ModelDisplayer::wheelEvent(QWheelEvent * event)
+{
+	if (event->delta() > 0) {
+		m_camera_pos.setZ(m_camera_pos.z() + 0.5f);
+	}
+	else {
+		m_camera_pos.setZ(m_camera_pos.z() - 0.5f);
+	}
+
+	QMatrix4x4 rot;
+	rot.rotate(m_x_angle, QVector3D(1.f, 0.f, 0.f));
+	rot.rotate(m_y_angle, QVector3D(0.f, 1.f, 0.f));
+	QVector3D camera_pos_rotated = (rot * m_camera_pos).toVector3D();
+
+	render.setCameraPos(camera_pos_rotated);
+	render.render();
+	setImage(render.getRenderResult());
+
+	event->accept();
 }
 
 
