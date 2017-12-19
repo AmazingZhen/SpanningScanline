@@ -213,12 +213,36 @@ void SpanningScanline::ModelDisplayer::wheelEvent(QWheelEvent * event)
 
 void SpanningScanline::ModelDisplayer::mousePressEvent(QMouseEvent *event)
 {
+	m_mousePressX = event->x();
+	m_mousePressY = event->y();
+
 	if (event->buttons() == Qt::LeftButton) {
 		m_mode = Rotate;
 	}
 	else {
 		m_mode = Move;
 	}
+
+	event->accept();
+}
+
+void SpanningScanline::ModelDisplayer::mouseMoveEvent(QMouseEvent *event)
+{
+	float deltaX = event->x() - m_mousePressX;
+	float deltaY = event->y() - m_mousePressY;
+
+	if (m_mode == InteractionMode::Rotate) {
+		m_horizontalAngle -= deltaX * .4f;
+		m_verticalAngle -= deltaY * .4f;
+	}
+
+	m_mousePressX = event->x();
+	m_mousePressY = event->y();
+
+	event->accept();
+
+	updateCamera();
+	updateDisplay();
 }
 
 void SpanningScanline::ModelDisplayer::updateCamera()

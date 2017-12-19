@@ -39,9 +39,11 @@ namespace SpanningScanline {
 
 		bool loadImageFile(const QString & fileName);
 
+		// Interaction
 		void keyPressEvent(QKeyEvent *event);
 		void wheelEvent(QWheelEvent *event);
 		void mousePressEvent(QMouseEvent *event);
+		void mouseMoveEvent(QMouseEvent *event);
 
 		void updateCamera();
 		void updateDisplay();
@@ -65,6 +67,6 @@ namespace SpanningScanline {
 		float m_camera_distance;
 		float m_horizontalAngle, m_verticalAngle;
 		InteractionMode m_mode;
-		float mousePressX, mousePressY;
+		float m_mousePressX, m_mousePressY;
 	};
 }
