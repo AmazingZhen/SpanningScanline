@@ -2,7 +2,8 @@
 
 SpanningScanline::ModelRender::ModelRender(QRgb backgroundColor) :
 	m_backgroundColor(backgroundColor),
-	m_max_z(100.f)
+	m_max_z(100.f),
+	m_frameCount(0)
 {
 }
 
@@ -26,8 +27,8 @@ void SpanningScanline::ModelRender::render()
 	}
 
 	saveRenderResult();
-
-	// printf("Render finish\n");
+	m_frameCount++;
+	printf("Render %d frame finish\n", m_frameCount);
 }
 
 QImage SpanningScanline::ModelRender::getRenderResult()
@@ -48,8 +49,8 @@ void SpanningScanline::ModelRender::setWindowSize(int width, int height)
 	m_width = width;
 	m_height = height;
 
-	m_polygonTable = QVector<QVector<Polygon>>(m_height);
-	m_sideTable = QVector<QVector<Side>>(m_height);
+	//m_polygonTable = QVector<Polygon>();
+	//m_sideTable = QVector<QVector<Side>>(m_height);
 
 	m_z_buffer = QVector<float>(m_width);
 
@@ -74,7 +75,7 @@ void SpanningScanline::ModelRender::switchPolygon(bool up)
 // TO DO ...
 bool SpanningScanline::ModelRender::initialPolygonTableAndSideTable()
 {
-	m_polygonTable = QVector<QVector<Polygon>>(m_height);
+	m_polygonTable = QVector<Polygon>();
 	m_sideTable = QVector<QVector<Side>>(m_height);
 	m_activePolygonTable.clear();
 	m_activeSidePairTable.clear();
@@ -96,12 +97,15 @@ bool SpanningScanline::ModelRender::initialPolygonTableAndSideTable()
 		c_normal = getNormalFromBuffer(m_indices[i + 2]);
 
 		// Get color factor by normal * view
+		// polygon_pos = (a + b + c) / 3;
 		view = (m_camera_pos - polygon_pos).normalized();
 		polygon_normal = ((a_normal + b_normal + c_normal) / 3).normalized();
 		factor = QVector3D::dotProduct(polygon_normal, view);
+
 		if (factor <= 0.f) {
 			continue;
 		}
+
 		// printf("%f\n\n", factor);
 		/*
 		printf("%d\n", count);
@@ -147,24 +151,26 @@ bool SpanningScanline::ModelRender::addPolygon(const QVector3D & a, const QVecto
 		return false;
 	}
 
-	if (maxY < m_height) {  // maxY is in the screen
-		QVector3D normal = QVector3D::normal((a - b), (a - c));
-
-		// Add to polygon table
-		Polygon p;
-		p.id = count;
-		p.a = normal.x();
-		p.b = normal.y();
-		p.c = normal.z();
-		p.cross_y = maxY - minY;
-
-		p.color = qRgb(factor * 255, factor * 255, factor * 255);
-
-		m_polygonTable[maxY].push_back(p);
-	}
-	else {
+	if (maxY >= m_height) {  // maxY is out the screen
 		// TO DO ...
+
+		return false;
 	}
+
+	QVector3D normal = QVector3D::normal((a - b), (a - c));
+
+	// Add to polygon table
+	Polygon p;
+	p.id = count;
+	p.a = normal.x();
+	p.b = normal.y();
+	p.c = normal.z();
+	p.d = -(p.a * a.x() + p.b * a.y() + p.c * a.z());
+	p.cross_y = maxY - minY;
+
+	p.color = qRgb(factor * 255, factor * 255, factor * 255);
+
+	m_polygonTable.push_back(p);
 
 	return true;
 }
@@ -212,21 +218,15 @@ bool SpanningScanline::ModelRender::addSide(const QVector3D &a, const QVector3D 
 
 	m_sideTable[max_y].push_back(side);
 
-	/*
-	if (side.polygon_id == 2) {
-		cout << max_y << endl;
-		side.print();
-	}
-	//*/
-
 	return true;
 }
 
 void SpanningScanline::ModelRender::scanlineRender(int scanline)
 {
 	initialZBbuffer();
-	activePolygonsAndSides(scanline);
+	activeSides(scanline);
 	scan(scanline);
+	updateActiveSideList();
 }
 
 void SpanningScanline::ModelRender::initialFrameBuffer()
@@ -247,43 +247,26 @@ void SpanningScanline::ModelRender::initialZBbuffer()
 
 bool SpanningScanline::ModelRender::activePolygonsAndSides(int scanline)
 {
-	if (m_polygonTable[scanline].isEmpty()) {
-		return false;
-	}
 
-	for (const Polygon &p : m_polygonTable[scanline]) {
-		m_activePolygonTable.push_back(p);
-		
-		activeSides(scanline, p);
-	}
 
 	return true;
 }
 
-bool SpanningScanline::ModelRender::activeSides(int scanline, const Polygon &p)
+bool SpanningScanline::ModelRender::activeSides(int scanline)
 {
 	if (m_sideTable[scanline].isEmpty()) {
 		return false;
 	}
 
-	int count = 0;
-	Side sides[2];
-	for (const Side &s : m_sideTable[scanline]) if (s.polygon_id == p.id){
-		sides[count] = s;
-		count++;
-
-		if (count == 2) {
-			break;
-		}
+	for (const Side &s : m_sideTable[scanline]) if (!singlePolygon || s.polygon_id == m_curPolygonId) {
+		m_activeSideList.push_back(s);
 	}
 
-	if (count < 2) {
-		// TO DO ...
+	qSort(m_activeSideList.begin(), m_activeSideList.end(), [](const Side &a, const Side &b) {
+		return a.x < b.x;
+	});
 
-		return false;
-	}
-
-	return activeSidePair(sides[0], sides[1], p);
+	return true;
 }
 
 bool SpanningScanline::ModelRender::activeSidePair(const Side &a, const Side &b, const Polygon &p)
@@ -329,55 +312,66 @@ bool SpanningScanline::ModelRender::activeSidePair(const Side &a, const Side &b,
 	return true;
 }
 
-void SpanningScanline::ModelRender::scan(int line)
-{
-	if (m_activeSidePairTable.isEmpty()) {
-		return;
+float getZ(const SpanningScanline::Polygon &p, int x, int y) {
+	if (p.c != 0.f) {
+		return -(p.a * x + p.b * y + p.d) / p.c;
 	}
 	
-	//QVector3D view = (m_projection * QVector4D(m_modelview.row(2)[0], m_modelview.row(2)[1], m_modelview.row(2)[2], 0.f)).toVector3D().normalized();
+	return 100.f;
+}
 
-	//printf("curline: %d\n", line);
+void SpanningScanline::ModelRender::scan(int line)
+{
+	auto s_iter_left = m_activeSideList.begin();
 
-	auto sp_iter = m_activeSidePairTable.begin();
+	QList<Polygon> activePolygonList;
+	while (s_iter_left != m_activeSideList.end() && s_iter_left->x < m_width) {
+		Side &s_left = *s_iter_left;
+		// Update activePolygonList
+		auto p_iter = activePolygonList.begin();
 
-	while (sp_iter != m_activeSidePairTable.end()) {
-		SidePair &sp = *sp_iter;	
-
-		///*
-		if (singlePolygon && sp.polygon_id != m_curPolygonId) {
-			sp_iter++;
-			continue;
-		}
-		//*/
-
-		float cur_z = sp.z_l;
-		//float factor = std::abs(QVector4D::dotProduct(view, sp.normal));
-		//int gray = 255 * factor;
-		//qDebug() << sp.normal;
-		//printf("factor: %f\n", factor);
-
-		for (int x = sp.x_l; x <= sp.x_r; x++) {
-			if (x < 0 || x >= m_width) {
+		bool flagIn = true;
+		while (p_iter != activePolygonList.end()) {
+			if (p_iter->id == s_left.polygon_id) {
+				// If find, it means that scanline is out of the polygon
+				activePolygonList.erase(p_iter);
+				flagIn = false;
 				break;
 			}
+			p_iter++;
+		}
+		if (flagIn) {
+			activePolygonList.push_back(m_polygonTable[s_left.polygon_id]);
+		}
 
-			if (cur_z < m_z_buffer[x]) {
-				m_z_buffer[x] = cur_z;
+		auto s_iter_right = s_iter_left + 1;
 
-				// Color  TO DO ...
-				//m_frame_buffer[line][x] = (x < sp.x_r + 1 && x > sp.x_l + 1) ? m_backgroundColor : qRgb(255, 255, 255);
-				m_frame_buffer[line][x] = sp.color;
-				// m_frame_buffer[line][x] = qRgb(255, 255, 255);
+		if (s_iter_right != m_activeSideList.end()) {
+			Side &s_right = *s_iter_right;
+			QRgb color = Qt::red;
 
-				//m_frame_buffer[line][x] = qRgb(gray, gray, gray);
+			if (activePolygonList.size() > 1) {  // find closest polygon
+				int x = (s_left.x + s_right.x) / 2;
+				float min_z = m_max_z;
+				int closestPolygonId = -1;
+				for (auto &p : activePolygonList) {
+					float z = getZ(p, x, line);
+					if (z < min_z) {
+						min_z = z;
+						closestPolygonId = p.id;
+					}
+				}
+				if (closestPolygonId != -1) {
+					color = m_polygonTable[closestPolygonId].color;
+				}
+			} else if (!activePolygonList.empty()) {
+				color = activePolygonList[0].color;	
 			}
 
-			cur_z += sp.dz_along_x;
+			drawLine(s_left.x, s_right.x, line, color);
 		}
-		// printf("\n\n");
 
-		updateSidePair(sp_iter, line);
+		s_iter_left = s_iter_right;
 	}
 }
 
@@ -442,6 +436,41 @@ void SpanningScanline::ModelRender::updateSidePair(QList<SidePair>::iterator &sp
 	sp.z_l += sp.dz_along_x * sp.dx_l + sp.dz_along_y;
 
 	sp_iter++;
+}
+
+void SpanningScanline::ModelRender::updateActiveSideList()
+{
+	auto s_iter = m_activeSideList.begin();
+
+	while (s_iter != m_activeSideList.end()) {
+		Side &s = *s_iter;
+
+		s.cross_y--;
+		if (s.cross_y <= 0) {
+			s_iter = m_activeSideList.erase(s_iter);
+			continue;
+		}
+
+		s.x += s.delta_x;
+
+		s_iter++;
+	}
+
+	qSort(m_activeSideList.begin(), m_activeSideList.end(), [](const Side &a, const Side &b) {
+		return a.x < b.x;
+	});
+}
+
+int SpanningScanline::ModelRender::findClosestPolygon(int x, int y)
+{
+	return 0;
+}
+
+void SpanningScanline::ModelRender::drawLine(int x1, int x2, int y, QRgb color)
+{
+	for (int x = max(0, x1); x < min(x2, m_width); x++) {
+		m_frame_buffer[y][x] = color;
+	}
 }
 
 void SpanningScanline::ModelRender::saveRenderResult()

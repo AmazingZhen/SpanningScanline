@@ -15,6 +15,11 @@ class QScrollArea;
 class QScrollBar;
 
 namespace SpanningScanline {
+	enum InteractionMode {
+		Rotate,
+		Move
+	};
+
 	class ModelDisplayer : public QMainWindow
 	{
 		Q_OBJECT
@@ -22,7 +27,7 @@ namespace SpanningScanline {
 	public:
 		ModelDisplayer(QWidget *parent = Q_NULLPTR);
 
-		private slots:
+	private slots:
 		void open();
 		void openImage();
 
@@ -36,6 +41,10 @@ namespace SpanningScanline {
 
 		void keyPressEvent(QKeyEvent *event);
 		void wheelEvent(QWheelEvent *event);
+		void mousePressEvent(QMouseEvent *event);
+
+		void updateCamera();
+		void updateDisplay();
 
 		QImage image;
 		QLabel *imageLabel;
@@ -52,7 +61,10 @@ namespace SpanningScanline {
 		int m_width, m_height;
 		ModelRender render;
 
-		QVector4D m_camera_pos;
-		int m_x_angle, m_y_angle;
+		// Interaction
+		float m_camera_distance;
+		float m_horizontalAngle, m_verticalAngle;
+		InteractionMode m_mode;
+		float mousePressX, mousePressY;
 	};
 }

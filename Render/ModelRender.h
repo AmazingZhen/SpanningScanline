@@ -9,13 +9,21 @@
 using namespace std;
 
 namespace SpanningScanline {
+	enum State {
+		in,
+		out
+	};
+
 	struct Polygon {
 		unsigned int id;
 
 		float a, b, c;  // Normal vector of the polygon n = (a, b, c)
-		// double d;	// ax + by + cz + d = 0
+		double d;	// ax + by + cz + d = 0
 		int cross_y;	// The number of scanlines crossed by the polygon
+		
 		QRgb color;
+
+		State s;
 	};
 
 	struct Side {
@@ -73,6 +81,7 @@ namespace SpanningScanline {
 		QImage getRenderResult();
 
 		void setCameraPos(const QVector3D &pos);
+		void setModelviewMatrix(const QMatrix4x4 &m) { m_modelview = m; }
 		void setWindowSize(int width, int height);
 
 		int m_curPolygonId = 0;
@@ -93,10 +102,14 @@ namespace SpanningScanline {
 		void initialFrameBuffer();
 		void initialZBbuffer();
 		bool activePolygonsAndSides(int scanline);
-		bool activeSides(int scanline, const Polygon &p);
+		bool activeSides(int scanline);
 		bool activeSidePair(const Side &a, const Side &b, const Polygon &p);
 		void scan(int line);
 		void updateSidePair(QList<SidePair>::iterator &sp_iter, int scanline);
+
+		void updateActiveSideList();
+		int findClosestPolygon(int x, int y);
+		void drawLine(int x1, int x2, int y, QRgb color);
 
 		// save render result
 		void saveRenderResult();
@@ -107,9 +120,10 @@ namespace SpanningScanline {
 		float m_max_z;
 
 		// Data structure of scanline algorithm.
-		QVector<QVector<Polygon>> m_polygonTable;
+		QVector<Polygon> m_polygonTable;
 		QVector<QVector<Side>> m_sideTable;
 		QList<Polygon> m_activePolygonTable;
+		QList<Side> m_activeSideList;
 		QList<SidePair> m_activeSidePairTable;
 		QVector<float> m_z_buffer;
 		QVector<QVector<QRgb>> m_frame_buffer;
@@ -126,5 +140,6 @@ namespace SpanningScanline {
 		QRect m_viewport;
 
 		QImage m_result;
+		int m_frameCount;
 	};
 }

@@ -19,9 +19,10 @@ ModelDisplayer::ModelDisplayer(QWidget *parent)
 	m_width(600),
 	m_height(600),
 	render(qRgb(0, 0, 0)),
-	m_camera_pos(0.f, 0.f, 5.f, 1.f),
-	m_x_angle(0),
-	m_y_angle(0)
+	m_camera_distance(3.f),
+	m_horizontalAngle(0.f),
+	m_verticalAngle(0.f),
+	m_mode(Rotate)
 {
 	ui.setupUi(this);
 
@@ -36,13 +37,13 @@ ModelDisplayer::ModelDisplayer(QWidget *parent)
 
 	createActions();
 
-	resize(QSize(600, 600));
+	resize(QSize(m_width, m_height));
 
 	typeFilter += "(";
 	typeFilter += loader.getSupportedTypes();
 	typeFilter += ");;All Files (*)";
 
-	render.setCameraPos(m_camera_pos.toVector3D());
+	updateCamera();
 	render.setWindowSize(m_width, m_height);
 }
 
@@ -153,19 +154,19 @@ void SpanningScanline::ModelDisplayer::keyPressEvent(QKeyEvent *event)
 	switch (event->key())
 	{
 	case Qt::Key_W:
-		m_x_angle += 3;
+		m_verticalAngle += 3;
 		rotate_camera = true;
 		break;
 	case Qt::Key_S:
-		m_x_angle -= 3;
+		m_verticalAngle -= 3;
 		rotate_camera = true;
 		break;
 	case Qt::Key_A:
-		m_y_angle += 3;
+		m_horizontalAngle += 3;
 		rotate_camera = true;
 		break;
 	case Qt::Key_D:
-		m_y_angle -= 3;
+		m_horizontalAngle -= 3;
 		rotate_camera = true;
 		break;
 	case Qt::Key_Q:
@@ -183,17 +184,11 @@ void SpanningScanline::ModelDisplayer::keyPressEvent(QKeyEvent *event)
 	}
 
 	if (rotate_camera) {
-		QMatrix4x4 rot;
-		rot.rotate(m_x_angle, QVector3D(1.f, 0.f, 0.f));
-		rot.rotate(m_y_angle, QVector3D(0.f, 1.f, 0.f));
-		QVector3D camera_pos_rotated = (rot * m_camera_pos).toVector3D();
-
-		render.setCameraPos(camera_pos_rotated);
+		updateCamera();
 	}
 
 	if (specific_key_pressed) {
-		render.render();
-		setImage(render.getRenderResult());
+		updateDisplay();
 	}
 
 	event->accept();
@@ -202,22 +197,58 @@ void SpanningScanline::ModelDisplayer::keyPressEvent(QKeyEvent *event)
 void SpanningScanline::ModelDisplayer::wheelEvent(QWheelEvent * event)
 {
 	if (event->delta() > 0) {
-		m_camera_pos.setZ(m_camera_pos.z() + 0.5f);
+		// m_camera_pos.setZ(m_camera_pos.z() + 0.5f);
+		m_camera_distance += 0.5f;
 	}
 	else {
-		m_camera_pos.setZ(m_camera_pos.z() - 0.5f);
+		//m_camera_pos.setZ(m_camera_pos.z() - 0.5f);
+		m_camera_distance -= 0.5f;
 	}
 
-	QMatrix4x4 rot;
-	rot.rotate(m_x_angle, QVector3D(1.f, 0.f, 0.f));
-	rot.rotate(m_y_angle, QVector3D(0.f, 1.f, 0.f));
-	QVector3D camera_pos_rotated = (rot * m_camera_pos).toVector3D();
-
-	render.setCameraPos(camera_pos_rotated);
-	render.render();
-	setImage(render.getRenderResult());
+	updateCamera();
+	updateDisplay();
 
 	event->accept();
+}
+
+void SpanningScanline::ModelDisplayer::mousePressEvent(QMouseEvent *event)
+{
+	if (event->buttons() == Qt::LeftButton) {
+		m_mode = Rotate;
+	}
+	else {
+		m_mode = Move;
+	}
+}
+
+void SpanningScanline::ModelDisplayer::updateCamera()
+{
+	/*
+	QQuaternion xRotation = QQuaternion::fromAxisAndAngle(1.0f, 0.0f, 0.0f, m_verticalAngle);
+	QQuaternion yRotation = QQuaternion::fromAxisAndAngle(0.0f, 1.0f, 0.0f, m_horizontalAngle);
+	// QQuaternion zRotation = QQuaternion::fromAxisAndAngle(0.0f, 0.0f, 1.0f, m_verticalAngle);
+	QQuaternion totalRotation = yRotation * xRotation;
+
+	QMatrix4x4 rotation = QMatrix4x4(totalRotation.toRotationMatrix());
+	QVector4D camera_pos(0, 0, m_camera_distance, 1);
+
+	QVector3D camera_pos_rotated = (rotation * camera_pos).toVector3D();
+	render.setCameraPos(camera_pos_rotated);
+	*/
+
+	QMatrix4x4 rot;
+	rot.rotate(m_horizontalAngle, QVector3D(0.f, 1.f, 0.f));
+	rot.rotate(m_verticalAngle, QVector3D(1.f, 0.f, 0.f));
+	QVector4D camera_pos(0, 0, m_camera_distance, 1);
+
+	QVector3D camera_pos_rotated = (rot * camera_pos).toVector3D();
+	render.setCameraPos(camera_pos_rotated);
+}
+
+void SpanningScanline::ModelDisplayer::updateDisplay()
+{
+	render.render();
+	setImage(render.getRenderResult());
 }
 
 
