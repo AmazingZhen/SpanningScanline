@@ -18,8 +18,8 @@ ModelDisplayer::ModelDisplayer(QWidget *parent)
 	loader(false),
 	m_width(600),
 	m_height(600),
-	render(qRgb(0, 0, 0)),
-	m_camera_distance(3.f),
+	render(qRgb(128, 128, 0)),
+	m_camera_distance(5.f),
 	m_horizontalAngle(0.f),
 	m_verticalAngle(0.f),
 	m_mode(Rotate)

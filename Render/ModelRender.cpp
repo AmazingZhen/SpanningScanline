@@ -68,8 +68,6 @@ void SpanningScanline::ModelRender::switchPolygon(bool up)
 	m_curPolygonId += up ? 1 : -1;
 	m_curPolygonId += m_indices.size() / 3;
 	m_curPolygonId %= m_indices.size() / 3;
-
-	printf("%d\n", m_curPolygonId);
 }
 
 // TO DO ...
@@ -102,17 +100,9 @@ bool SpanningScanline::ModelRender::initialPolygonTableAndSideTable()
 		polygon_normal = ((a_normal + b_normal + c_normal) / 3).normalized();
 		factor = QVector3D::dotProduct(polygon_normal, view);
 
-		if (factor <= 0.f) {
-			continue;
-		}
-
-		// printf("%f\n\n", factor);
-		/*
-		printf("%d\n", count);
-		qDebug() << origin_polygon_normal;
-		qDebug() << forward;
-		printf("%f\n\n", factor);
-		*/
+		//if (factor <= 0.f) {
+			//continue;
+		//}
 
 		a_project = a.project(m_modelview, m_projection, m_viewport);
 		b_project = b.project(m_modelview, m_projection, m_viewport);
@@ -158,6 +148,10 @@ bool SpanningScanline::ModelRender::addPolygon(const QVector3D & a, const QVecto
 	}
 
 	QVector3D normal = QVector3D::normal((a - b), (a - c));
+	if (normal.z() == 0) {
+		printf("zero plane");
+		return false;
+	}
 
 	// Add to polygon table
 	Polygon p;
@@ -186,7 +180,7 @@ bool SpanningScanline::ModelRender::addSides(const QVector3D & a, const QVector3
 
 bool SpanningScanline::ModelRender::addSide(const QVector3D &a, const QVector3D &b, int polygon_id)
 {
-	if (std::abs(a.y() - b.y()) < 0.2f) {  // ignore side parallel to scanline
+	if (std::abs((int)a.y() - (int)b.y()) == 0) {  // ignore side parallel to scanline
 		return false;
 	}
 
@@ -223,7 +217,6 @@ bool SpanningScanline::ModelRender::addSide(const QVector3D &a, const QVector3D 
 
 void SpanningScanline::ModelRender::scanlineRender(int scanline)
 {
-	initialZBbuffer();
 	activeSides(scanline);
 	scan(scanline);
 	updateActiveSideList();
@@ -238,13 +231,6 @@ void SpanningScanline::ModelRender::initialFrameBuffer()
 	}
 }
 
-void SpanningScanline::ModelRender::initialZBbuffer()
-{
-	for (int i = 0; i < m_width; i++) {
-		m_z_buffer[i] = m_max_z;
-	}
-}
-
 bool SpanningScanline::ModelRender::activePolygonsAndSides(int scanline)
 {
 
@@ -254,10 +240,6 @@ bool SpanningScanline::ModelRender::activePolygonsAndSides(int scanline)
 
 bool SpanningScanline::ModelRender::activeSides(int scanline)
 {
-	if (m_sideTable[scanline].isEmpty()) {
-		return false;
-	}
-
 	for (const Side &s : m_sideTable[scanline]) if (!singlePolygon || s.polygon_id == m_curPolygonId) {
 		m_activeSideList.push_back(s);
 	}
@@ -265,49 +247,6 @@ bool SpanningScanline::ModelRender::activeSides(int scanline)
 	qSort(m_activeSideList.begin(), m_activeSideList.end(), [](const Side &a, const Side &b) {
 		return a.x < b.x;
 	});
-
-	return true;
-}
-
-bool SpanningScanline::ModelRender::activeSidePair(const Side &a, const Side &b, const Polygon &p)
-{
-	Side left, right;
-
-	if (a.x + a.delta_x < b.x + b.delta_x) {
-		left = a;
-		right = b;
-	}
-	else {
-		left = b;
-		right = a;
-	}
-
-	SidePair sidePair;
-	sidePair.polygon_id = left.polygon_id;
-
-	sidePair.x_l = left.x;
-	sidePair.dx_l = left.delta_x;
-	sidePair.cross_y_l = left.cross_y;
-
-	sidePair.x_r = right.x;
-	sidePair.dx_r = right.delta_x;
-	sidePair.cross_y_r = right.cross_y;
-
-	sidePair.z_l = left.z;
-
-	// ax + by + cz + d = 0
-	// dz / dx = -a / c, dz / dy = -b / c
-	if (p.c == 0) {
-		sidePair.dz_along_x = sidePair.dz_along_y = 0;
-	}
-	else {
-		sidePair.dz_along_x = -p.a / p.c;
-		sidePair.dz_along_y = p.b / p.c;
-	}
-
-	sidePair.color = p.color;
-
-	m_activeSidePairTable.push_back(sidePair);
 
 	return true;
 }
@@ -327,10 +266,11 @@ void SpanningScanline::ModelRender::scan(int line)
 	QList<Polygon> activePolygonList;
 	while (s_iter_left != m_activeSideList.end() && s_iter_left->x < m_width) {
 		Side &s_left = *s_iter_left;
+
 		// Update activePolygonList
 		auto p_iter = activePolygonList.begin();
-
 		bool flagIn = true;
+
 		while (p_iter != activePolygonList.end()) {
 			if (p_iter->id == s_left.polygon_id) {
 				// If find, it means that scanline is out of the polygon
@@ -348,7 +288,7 @@ void SpanningScanline::ModelRender::scan(int line)
 
 		if (s_iter_right != m_activeSideList.end()) {
 			Side &s_right = *s_iter_right;
-			QRgb color = Qt::red;
+			QRgb color = qRgb(255, 255, 255);
 
 			if (activePolygonList.size() > 1) {  // find closest polygon
 				int x = (s_left.x + s_right.x) / 2;
@@ -367,75 +307,15 @@ void SpanningScanline::ModelRender::scan(int line)
 			} else if (!activePolygonList.empty()) {
 				color = activePolygonList[0].color;	
 			}
+			else {
+				color = m_backgroundColor;
+			}
 
 			drawLine(s_left.x, s_right.x, line, color);
 		}
 
 		s_iter_left = s_iter_right;
 	}
-}
-
-void SpanningScanline::ModelRender::updateSidePair(QList<SidePair>::iterator &sp_iter, int scanline)
-{
-	SidePair &sp = *sp_iter;
-
-	/*
-	if (sp.polygon_id == 2) {
-		cout << scanline << endl;
-		sp.print();
-	}
-	//*/
-
-	if (sp.cross_y_l == 0 && sp.cross_y_r == 0) {  // two side both out of scanline
-		// TO DO ...
-
-		sp_iter = m_activeSidePairTable.erase(sp_iter);
-		return;
-	}
-	else if (sp.cross_y_l == 0 || sp.cross_y_r == 0) {    // one side out of scanline
-		Side newSide;
-		bool isFound = false;
-
-		for (const Side& s : m_sideTable[scanline]) {
-			if (s.polygon_id == sp.polygon_id) {
-				newSide = s;
-				isFound = true;
-				break;
-			}
-		}
-
-		if (!isFound) {
-			sp_iter = m_activeSidePairTable.erase(sp_iter);
-			return;
-		}
-
-		// replace one of side pair
-		if (sp.cross_y_l == 0) {  // left side
-			sp.x_l = newSide.x;
-			sp.cross_y_l = newSide.cross_y;
-			sp.dx_l = newSide.delta_x;
-
-			sp.z_l = newSide.z;
-		}
-		else {  // right side
-			sp.x_r = newSide.x;
-			sp.cross_y_r = newSide.cross_y;
-			sp.dx_r = newSide.delta_x;
-		}
-	}
-
-	sp.cross_y_l--;
-	sp.cross_y_r--;
-
-	// dx / dy = d_x,  dy = -1(one pixel down), so dx = -1 / k
-	sp.x_l += sp.dx_l;
-	sp.x_r += sp.dx_r;
-
-	// dz / dx = -a / c
-	// dz / dy = -b / c, dy = -1
-	sp.z_l += sp.dz_along_x * sp.dx_l + sp.dz_along_y;
-
-	sp_iter++;
 }
 
 void SpanningScanline::ModelRender::updateActiveSideList()
@@ -455,10 +335,6 @@ void SpanningScanline::ModelRender::updateActiveSideList()
 
 		s_iter++;
 	}
-
-	qSort(m_activeSideList.begin(), m_activeSideList.end(), [](const Side &a, const Side &b) {
-		return a.x < b.x;
-	});
 }
 
 int SpanningScanline::ModelRender::findClosestPolygon(int x, int y)

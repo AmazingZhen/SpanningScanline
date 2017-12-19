@@ -100,12 +100,12 @@ namespace SpanningScanline {
 		// Render
 		void scanlineRender(int scanline);
 		void initialFrameBuffer();
-		void initialZBbuffer();
+		//void initialZBbuffer();
 		bool activePolygonsAndSides(int scanline);
 		bool activeSides(int scanline);
-		bool activeSidePair(const Side &a, const Side &b, const Polygon &p);
+		//bool activeSidePair(const Side &a, const Side &b, const Polygon &p);
 		void scan(int line);
-		void updateSidePair(QList<SidePair>::iterator &sp_iter, int scanline);
+		//void updateSidePair(QList<SidePair>::iterator &sp_iter, int scanline);
 
 		void updateActiveSideList();
 		int findClosestPolygon(int x, int y);
