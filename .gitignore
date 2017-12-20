@@ -244,3 +244,4 @@ ModelManifest.xml
 # FAKE - F# Make
 .fake/
 /GeneratedFiles
+/报告20171220-1610.diagsession

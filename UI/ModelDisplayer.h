@@ -29,15 +29,12 @@ namespace SpanningScanline {
 
 	private slots:
 		void open();
-		void openImage();
 
 	private:
 		void createActions();
 		void updateActions();
 
 		void setImage(const QImage &newImage);
-
-		bool loadImageFile(const QString & fileName);
 
 		// Interaction
 		void keyPressEvent(QKeyEvent *event);

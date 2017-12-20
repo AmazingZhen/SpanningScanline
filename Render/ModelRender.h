@@ -77,7 +77,7 @@ namespace SpanningScanline {
 	public:
 		ModelRender(QRgb backgroundColor);
 		void setBufferData(const QVector<float> &vertices, const QVector<float> &normals, const QVector<unsigned int> &indices);
-		void render();
+		bool render();
 		QImage getRenderResult();
 
 		void setCameraPos(const QVector3D &pos);
@@ -100,12 +100,8 @@ namespace SpanningScanline {
 		// Render
 		void scanlineRender(int scanline);
 		void initialFrameBuffer();
-		//void initialZBbuffer();
-		bool activePolygonsAndSides(int scanline);
 		bool activeSides(int scanline);
-		//bool activeSidePair(const Side &a, const Side &b, const Polygon &p);
 		void scan(int line);
-		//void updateSidePair(QList<SidePair>::iterator &sp_iter, int scanline);
 
 		void updateActiveSideList();
 		int findClosestPolygon(int x, int y);
@@ -122,11 +118,8 @@ namespace SpanningScanline {
 		// Data structure of scanline algorithm.
 		QVector<Polygon> m_polygonTable;
 		QVector<QVector<Side>> m_sideTable;
-		QList<Polygon> m_activePolygonTable;
 		QList<Side> m_activeSideList;
-		QList<SidePair> m_activeSidePairTable;
-		QVector<float> m_z_buffer;
-		QVector<QVector<QRgb>> m_frame_buffer;
+		QRgb *m_frame_buffer;
 
 		// Vertex data.
 		QVector<float> m_vertices;

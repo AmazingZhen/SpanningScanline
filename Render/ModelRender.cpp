@@ -3,7 +3,8 @@
 SpanningScanline::ModelRender::ModelRender(QRgb backgroundColor) :
 	m_backgroundColor(backgroundColor),
 	m_max_z(100.f),
-	m_frameCount(0)
+	m_frameCount(0),
+	m_frame_buffer(0)
 {
 }
 
@@ -14,11 +15,20 @@ void SpanningScanline::ModelRender::setBufferData(const QVector<float> &vertices
 	m_indices = QVector<unsigned int>(indices);
 }
 
-void SpanningScanline::ModelRender::render()
+bool SpanningScanline::ModelRender::render()
 {
-	if (!initialPolygonTableAndSideTable()) {
-		return;
+	static bool isRendering = false;
+
+	if (isRendering) {
+		printf("is rendering\n");
+		return false;
 	}
+
+	if (!initialPolygonTableAndSideTable()) {
+		return false;
+	}
+
+	isRendering = true;
 
 	initialFrameBuffer();
 
@@ -29,6 +39,10 @@ void SpanningScanline::ModelRender::render()
 	saveRenderResult();
 	m_frameCount++;
 	printf("Render %d frame finish\n", m_frameCount);
+
+	isRendering = false;
+
+	return true;
 }
 
 QImage SpanningScanline::ModelRender::getRenderResult()
@@ -49,12 +63,11 @@ void SpanningScanline::ModelRender::setWindowSize(int width, int height)
 	m_width = width;
 	m_height = height;
 
-	//m_polygonTable = QVector<Polygon>();
-	//m_sideTable = QVector<QVector<Side>>(m_height);
+	if (m_frame_buffer) {
+		delete m_frame_buffer;
+	}
+	m_frame_buffer = new QRgb[m_height * m_width];
 
-	m_z_buffer = QVector<float>(m_width);
-
-	m_frame_buffer = QVector<QVector<QRgb>>(m_height, QVector<QRgb>(m_width));
 	m_result = QImage(m_width, m_height, QImage::Format_RGB32);
 
 	m_projection = QMatrix4x4();
@@ -75,8 +88,8 @@ bool SpanningScanline::ModelRender::initialPolygonTableAndSideTable()
 {
 	m_polygonTable = QVector<Polygon>();
 	m_sideTable = QVector<QVector<Side>>(m_height);
-	m_activePolygonTable.clear();
-	m_activeSidePairTable.clear();
+
+	m_activeSideList.clear();
 
 	QVector3D a, b, c, polygon_pos;
 	QVector3D a_normal, b_normal, c_normal, polygon_normal;
@@ -143,7 +156,7 @@ bool SpanningScanline::ModelRender::addPolygon(const QVector3D & a, const QVecto
 
 	if (maxY >= m_height) {  // maxY is out the screen
 		// TO DO ...
-
+		// Actually it needs triangle clipping
 		return false;
 	}
 
@@ -224,18 +237,10 @@ void SpanningScanline::ModelRender::scanlineRender(int scanline)
 
 void SpanningScanline::ModelRender::initialFrameBuffer()
 {
-	for (int i = 0; i < m_height; i++) {
-		for (int j = 0; j < m_width; j++) {
-			m_frame_buffer[i][j] = m_backgroundColor;
-		}
+#pragma omp parallel for
+	for (int i = 0; i < m_height * m_width; i++) {
+		m_frame_buffer[i] = m_backgroundColor;
 	}
-}
-
-bool SpanningScanline::ModelRender::activePolygonsAndSides(int scanline)
-{
-
-
-	return true;
 }
 
 bool SpanningScanline::ModelRender::activeSides(int scanline)
@@ -263,25 +268,17 @@ void SpanningScanline::ModelRender::scan(int line)
 {
 	auto s_iter_left = m_activeSideList.begin();
 
-	QList<Polygon> activePolygonList;
+	QHash<int, Polygon> activePolygonHashmap;
 	while (s_iter_left != m_activeSideList.end() && s_iter_left->x < m_width) {
 		Side &s_left = *s_iter_left;
 
 		// Update activePolygonList
-		auto p_iter = activePolygonList.begin();
-		bool flagIn = true;
-
-		while (p_iter != activePolygonList.end()) {
-			if (p_iter->id == s_left.polygon_id) {
-				// If find, it means that scanline is out of the polygon
-				activePolygonList.erase(p_iter);
-				flagIn = false;
-				break;
-			}
-			p_iter++;
+		auto p_iter = activePolygonHashmap.find(s_left.polygon_id);
+		if (p_iter == activePolygonHashmap.end()) {
+			activePolygonHashmap[s_left.polygon_id] = m_polygonTable[s_left.polygon_id];
 		}
-		if (flagIn) {
-			activePolygonList.push_back(m_polygonTable[s_left.polygon_id]);
+		else {
+			activePolygonHashmap.erase(p_iter);
 		}
 
 		auto s_iter_right = s_iter_left + 1;
@@ -290,11 +287,11 @@ void SpanningScanline::ModelRender::scan(int line)
 			Side &s_right = *s_iter_right;
 			QRgb color = qRgb(255, 255, 255);
 
-			if (activePolygonList.size() > 1) {  // find closest polygon
+			if (activePolygonHashmap.size() > 1) {  // find closest polygon
 				int x = (s_left.x + s_right.x) / 2;
 				float min_z = m_max_z;
 				int closestPolygonId = -1;
-				for (auto &p : activePolygonList) {
+				for (auto &p : activePolygonHashmap) {
 					float z = getZ(p, x, line);
 					if (z < min_z) {
 						min_z = z;
@@ -304,8 +301,8 @@ void SpanningScanline::ModelRender::scan(int line)
 				if (closestPolygonId != -1) {
 					color = m_polygonTable[closestPolygonId].color;
 				}
-			} else if (!activePolygonList.empty()) {
-				color = activePolygonList[0].color;	
+			} else if (!activePolygonHashmap.empty()) {
+				color = activePolygonHashmap.begin()->color;
 			}
 			else {
 				color = m_backgroundColor;
@@ -344,16 +341,30 @@ int SpanningScanline::ModelRender::findClosestPolygon(int x, int y)
 
 void SpanningScanline::ModelRender::drawLine(int x1, int x2, int y, QRgb color)
 {
+	int offset = (m_height - 1 - y) * m_width;
+
 	for (int x = max(0, x1); x < min(x2, m_width); x++) {
-		m_frame_buffer[y][x] = color;
+		m_frame_buffer[offset + x] = color;
 	}
 }
 
 void SpanningScanline::ModelRender::saveRenderResult()
 {
+	/*
+#pragma omp parallel for
 	for (int r = 0; r < m_height; r++) {
 		for (int c = 0; c < m_width; c++) {
 			m_result.setPixel(c, m_height - 1 - r, m_frame_buffer[r][c]);
 		}
+	}
+	*/
+
+	QRgb *st = (QRgb*)m_result.bits();
+	int pixelCount = m_result.width() * m_result.height();
+
+#pragma omp parallel for
+	for (int p = 0; p < pixelCount; p++) {
+		// st[p] has an individual pixel
+		st[p] = m_frame_buffer[p];
 	}
 }
