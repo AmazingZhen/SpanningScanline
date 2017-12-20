@@ -45,13 +45,15 @@ namespace SpanningScanline {
 		void updateCamera();
 		void updateDisplay();
 
+		void resetCamera();
+
 		QImage image;
 		QLabel *imageLabel;
 		QScrollArea *scrollArea;
 		double scaleFactor;
 
 		Ui::ModelDisplayerClass ui;
-
+		
 		// Loader
 		std::string typeFilter;
 		ModelLoader loader;

@@ -92,7 +92,7 @@ bool SpanningScanline::ModelRender::initialPolygonTableAndSideTable()
 
 	int count = 0;
 
-	#pragma omp parallel
+	//#pragma omp parallel
 	{
 		QVector3D a, b, c, polygon_pos;
 		QVector3D a_normal, b_normal, c_normal, polygon_normal;
@@ -100,7 +100,7 @@ bool SpanningScanline::ModelRender::initialPolygonTableAndSideTable()
 		QVector3D view;
 		float factor = 0.f;
 
-		#pragma omp for
+		//#pragma omp for
 		for (int i = 0; i < m_indices.size(); i += 3) {
 			a = getVertexFromBuffer(m_indices[i]);
 			b = getVertexFromBuffer(m_indices[i + 1]);
@@ -124,7 +124,7 @@ bool SpanningScanline::ModelRender::initialPolygonTableAndSideTable()
 			b_project = b.project(m_modelview, m_projection, m_viewport);
 			c_project = c.project(m_modelview, m_projection, m_viewport);
 
-			#pragma omp critical
+			//#pragma omp critical
 			{
 				if (addPolygon(a_project, b_project, c_project, factor, count)) {
 					addSides(a_project, b_project, c_project, count);

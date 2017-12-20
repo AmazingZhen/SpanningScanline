@@ -76,6 +76,7 @@ void ModelDisplayer::open() {
 		tr(typeFilter.c_str()));
 
 	if (!fileName.isEmpty()) {
+		loader = ModelLoader(false);
 		bool loaded = loader.load(fileName, ModelLoader::PathType::AbsolutePath);
 
 		if (loaded) {
@@ -86,6 +87,7 @@ void ModelDisplayer::open() {
 			loader.getBufferData(&vertices, &normals, &indices);
 			render.setBufferData(*vertices, *normals, *indices);
 			
+			resetCamera();
 			updateDisplay();
 		}
 	}
@@ -223,6 +225,15 @@ void SpanningScanline::ModelDisplayer::updateDisplay()
 
 		setImage(render.getRenderResult());
 	}
+}
+
+void SpanningScanline::ModelDisplayer::resetCamera()
+{
+	m_camera_distance = 5.f;
+	m_horizontalAngle = 0.f;
+	m_verticalAngle = 0.f;
+
+	updateCamera();
 }
 
 
