@@ -64,7 +64,7 @@ namespace SpanningScanline {
 
 		ModelLoader(bool transformToUnitCoordinates = true);
 
-		std::string getSupportedTypes();
+		static std::string getSupportedTypes();
 
 		bool load(QString filePath, PathType pathType);
 		void getBufferData(QVector<float> **vertices, QVector<float> **normals,

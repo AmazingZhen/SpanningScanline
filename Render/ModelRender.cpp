@@ -20,7 +20,6 @@ bool SpanningScanline::ModelRender::render()
 	static bool isRendering = false;
 
 	if (isRendering) {
-		printf("is rendering\n");
 		return false;
 	}
 
@@ -91,40 +90,48 @@ bool SpanningScanline::ModelRender::initialPolygonTableAndSideTable()
 
 	m_activeSideList.clear();
 
-	QVector3D a, b, c, polygon_pos;
-	QVector3D a_normal, b_normal, c_normal, polygon_normal;
-	QVector3D a_project, b_project, c_project;
-	QVector3D view;
-	float factor = 0.f;
 	int count = 0;
 
-	for (int i = 0; i < m_indices.size(); i += 3) {
-		a = getVertexFromBuffer(m_indices[i]);
-		b = getVertexFromBuffer(m_indices[i + 1]);
-		c = getVertexFromBuffer(m_indices[i + 2]);
-		
-		a_normal = getNormalFromBuffer(m_indices[i]);
-		b_normal = getNormalFromBuffer(m_indices[i + 1]);
-		c_normal = getNormalFromBuffer(m_indices[i + 2]);
+	#pragma omp parallel
+	{
+		QVector3D a, b, c, polygon_pos;
+		QVector3D a_normal, b_normal, c_normal, polygon_normal;
+		QVector3D a_project, b_project, c_project;
+		QVector3D view;
+		float factor = 0.f;
 
-		// Get color factor by normal * view
-		// polygon_pos = (a + b + c) / 3;
-		view = (m_camera_pos - polygon_pos).normalized();
-		polygon_normal = ((a_normal + b_normal + c_normal) / 3).normalized();
-		factor = QVector3D::dotProduct(polygon_normal, view);
+		#pragma omp for
+		for (int i = 0; i < m_indices.size(); i += 3) {
+			a = getVertexFromBuffer(m_indices[i]);
+			b = getVertexFromBuffer(m_indices[i + 1]);
+			c = getVertexFromBuffer(m_indices[i + 2]);
 
-		//if (factor <= 0.f) {
-			//continue;
-		//}
+			a_normal = getNormalFromBuffer(m_indices[i]);
+			b_normal = getNormalFromBuffer(m_indices[i + 1]);
+			c_normal = getNormalFromBuffer(m_indices[i + 2]);
 
-		a_project = a.project(m_modelview, m_projection, m_viewport);
-		b_project = b.project(m_modelview, m_projection, m_viewport);
-		c_project = c.project(m_modelview, m_projection, m_viewport);
+			// Get color factor by normal * view
+			// polygon_pos = (a + b + c) / 3;
+			view = (m_camera_pos - polygon_pos).normalized();
+			polygon_normal = ((a_normal + b_normal + c_normal) / 3).normalized();
+			factor = QVector3D::dotProduct(polygon_normal, view);
 
-		if (addPolygon(a_project, b_project, c_project, factor, count)) {
-			addSides(a_project, b_project, c_project, count);
+			//if (factor <= 0.f) {
+				//continue;
+			//}
 
-			count++;
+			a_project = a.project(m_modelview, m_projection, m_viewport);
+			b_project = b.project(m_modelview, m_projection, m_viewport);
+			c_project = c.project(m_modelview, m_projection, m_viewport);
+
+			#pragma omp critical
+			{
+				if (addPolygon(a_project, b_project, c_project, factor, count)) {
+					addSides(a_project, b_project, c_project, count);
+
+					count++;
+				}
+			}
 		}
 	}
 
@@ -162,7 +169,7 @@ bool SpanningScanline::ModelRender::addPolygon(const QVector3D & a, const QVecto
 
 	QVector3D normal = QVector3D::normal((a - b), (a - c));
 	if (normal.z() == 0) {
-		printf("zero plane");
+		// printf("zero plane");
 		return false;
 	}
 
@@ -237,7 +244,7 @@ void SpanningScanline::ModelRender::scanlineRender(int scanline)
 
 void SpanningScanline::ModelRender::initialFrameBuffer()
 {
-#pragma omp parallel for
+	#pragma omp parallel for
 	for (int i = 0; i < m_height * m_width; i++) {
 		m_frame_buffer[i] = m_backgroundColor;
 	}
@@ -254,14 +261,6 @@ bool SpanningScanline::ModelRender::activeSides(int scanline)
 	});
 
 	return true;
-}
-
-float getZ(const SpanningScanline::Polygon &p, int x, int y) {
-	if (p.c != 0.f) {
-		return -(p.a * x + p.b * y + p.d) / p.c;
-	}
-	
-	return 100.f;
 }
 
 void SpanningScanline::ModelRender::scan(int line)
@@ -288,16 +287,18 @@ void SpanningScanline::ModelRender::scan(int line)
 			QRgb color = qRgb(255, 255, 255);
 
 			if (activePolygonHashmap.size() > 1) {  // find closest polygon
-				int x = (s_left.x + s_right.x) / 2;
+				float x = (s_left.x + s_right.x) / 2.f;
 				float min_z = m_max_z;
 				int closestPolygonId = -1;
+
 				for (auto &p : activePolygonHashmap) {
-					float z = getZ(p, x, line);
+					float z = -(p.a * x + p.b * line + p.d) / p.c;
 					if (z < min_z) {
 						min_z = z;
 						closestPolygonId = p.id;
 					}
 				}
+
 				if (closestPolygonId != -1) {
 					color = m_polygonTable[closestPolygonId].color;
 				}
@@ -360,9 +361,9 @@ void SpanningScanline::ModelRender::saveRenderResult()
 	*/
 
 	QRgb *st = (QRgb*)m_result.bits();
-	int pixelCount = m_result.width() * m_result.height();
+	const int pixelCount = m_result.width() * m_result.height();
 
-#pragma omp parallel for
+	#pragma omp parallel for
 	for (int p = 0; p < pixelCount; p++) {
 		// st[p] has an individual pixel
 		st[p] = m_frame_buffer[p];

@@ -77,7 +77,6 @@ void ModelDisplayer::open() {
 
 	if (!fileName.isEmpty()) {
 		bool loaded = loader.load(fileName, ModelLoader::PathType::AbsolutePath);
-		qDebug() << loaded;
 
 		if (loaded) {
 			QVector<float> *vertices;
@@ -85,10 +84,9 @@ void ModelDisplayer::open() {
 			QVector<unsigned int> *indices;
 
 			loader.getBufferData(&vertices, &normals, &indices);
-
 			render.setBufferData(*vertices, *normals, *indices);
-			render.render();
-			setImage(render.getRenderResult());
+			
+			updateDisplay();
 		}
 	}
 }
@@ -144,11 +142,9 @@ void SpanningScanline::ModelDisplayer::keyPressEvent(QKeyEvent *event)
 void SpanningScanline::ModelDisplayer::wheelEvent(QWheelEvent * event)
 {
 	if (event->delta() > 0) {
-		// m_camera_pos.setZ(m_camera_pos.z() + 0.5f);
 		m_camera_distance += 0.5f;
 	}
 	else {
-		//m_camera_pos.setZ(m_camera_pos.z() - 0.5f);
 		m_camera_distance -= 0.5f;
 	}
 
