@@ -100,7 +100,7 @@ namespace SpanningScanline {
 		// Render
 		void scanlineRender(int scanline);
 		void initialFrameBuffer();
-		bool activeSides(int scanline);
+		bool activateSides(int scanline);
 		void scan(int line);
 
 		void updateActiveSideList();

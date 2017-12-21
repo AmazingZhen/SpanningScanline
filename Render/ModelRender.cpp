@@ -157,15 +157,17 @@ bool SpanningScanline::ModelRender::addPolygon(const QVector3D & a, const QVecto
 	int maxY = (int)std::max(std::max(a.y(), b.y()), c.y());
 	int minY = (int)std::min(std::min(a.y(), b.y()), c.y());
 
-	if (maxY < 0 || minY >= m_height) {  // out of screen
+	if (maxY < 0 || minY >= m_height) {  // totally out of screen
 		return false;
 	}
 
-	if (maxY >= m_height) {  // maxY is out the screen
+	/*
+	if (maxY >= m_height) {  // partly out of screen
 		// TO DO ...
 		// Actually it needs triangle clipping
 		return false;
 	}
+	*/
 
 	QVector3D normal = QVector3D::normal((a - b), (a - c));
 	if (normal.z() == 0) {
@@ -217,9 +219,7 @@ bool SpanningScanline::ModelRender::addSide(const QVector3D &a, const QVector3D 
 	int max_y = upper_vertex.y(), min_y = lower_vertex.y();
 	float x_of_max_y = upper_vertex.x(), x_of_min_y = lower_vertex.x();
 
-	if (max_y >= m_height || max_y < 0) {  // the upper vertex out of screen
-		// TO DO ...
-
+	if (max_y < 0) {  // the upper vertex out of screen bottom
 		return false;
 	}
 
@@ -230,6 +230,13 @@ bool SpanningScanline::ModelRender::addSide(const QVector3D &a, const QVector3D 
 	side.x = upper_vertex.x();
 	side.z = upper_vertex.z();
 
+	// If the upper vertex out of screen top, we 'cut' this side
+	while (max_y >= m_height) {
+		side.cross_y--;
+		side.x += side.delta_x;
+		max_y--;
+	}
+
 	m_sideTable[max_y].push_back(side);
 
 	return true;
@@ -237,7 +244,7 @@ bool SpanningScanline::ModelRender::addSide(const QVector3D &a, const QVector3D 
 
 void SpanningScanline::ModelRender::scanlineRender(int scanline)
 {
-	activeSides(scanline);
+	activateSides(scanline);
 	scan(scanline);
 	updateActiveSideList();
 }
@@ -250,7 +257,7 @@ void SpanningScanline::ModelRender::initialFrameBuffer()
 	}
 }
 
-bool SpanningScanline::ModelRender::activeSides(int scanline)
+bool SpanningScanline::ModelRender::activateSides(int scanline)
 {
 	for (const Side &s : m_sideTable[scanline]) if (!singlePolygon || s.polygon_id == m_curPolygonId) {
 		m_activeSideList.push_back(s);
@@ -348,6 +355,65 @@ void SpanningScanline::ModelRender::drawLine(int x1, int x2, int y, QRgb color)
 		m_frame_buffer[offset + x] = color;
 	}
 }
+
+/*
+bool SpanningScanline::ModelRender::activateSidesPartlyOutOfScreen(const QVector3D &a, const QVector3D &b, const QVector3D &c, int polygon_id)
+{
+	activateSidePartlyOutOfScreen(a, b, polygon_id);
+	activateSidePartlyOutOfScreen(a, c, polygon_id);
+	activateSidePartlyOutOfScreen(b, c, polygon_id);
+
+	return true;
+}
+
+bool SpanningScanline::ModelRender::activateSidePartlyOutOfScreen(const QVector3D &a, const QVector3D &b, int polygon_id)
+{
+	if ((int)a.y() >= m_height && (int)b.y() >= m_height) {  // ignore side totally out of screen
+		return false;
+	}
+
+	if ((int)a.y() < 0 && (int)b.y() < 0) {  // ignore side totally out of screen
+		return false;
+	}
+
+	QVector3D upper_vertex, lower_vertex;
+	if (a.y() > b.y()) {
+		upper_vertex = a;
+		lower_vertex = b;
+	}
+	else {
+		upper_vertex = b;
+		lower_vertex = a;
+	}
+
+	int max_y = upper_vertex.y(), min_y = lower_vertex.y();
+	float x_of_max_y = upper_vertex.x(), x_of_min_y = lower_vertex.x();
+
+	Side side;
+	side.cross_y = max_y - min_y;
+	side.delta_x = -(upper_vertex.x() - lower_vertex.x()) / (upper_vertex.y() - lower_vertex.y());
+	side.polygon_id = polygon_id;
+	side.x = upper_vertex.x();
+	side.z = upper_vertex.z();
+
+	if (max_y >= m_height) {  // Activate it now
+		m_activeSideList.push_back(side);
+	}
+	else {  // If this side is in the screen, we still add it to table and activate it later
+		m_sideTable[max_y].push_back(side);
+	}
+
+	return true;
+}
+
+bool SpanningScanline::ModelRender::preprocessActiveSideList()
+{
+
+
+	return false;
+}
+
+*/
 
 void SpanningScanline::ModelRender::saveRenderResult()
 {
