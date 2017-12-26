@@ -1,12 +1,6 @@
 #include "ModelDisplayer.h"
 #include <iostream>
 #include <QtWidgets>
-#if defined(QT_PRINTSUPPORT_LIB)
-#include <QtPrintSupport/qtprintsupportglobal.h>
-#if QT_CONFIG(printdialog)
-#include <QPrintDialog>
-#endif
-#endif
 
 using SpanningScanline::ModelDisplayer;
 
@@ -18,11 +12,12 @@ ModelDisplayer::ModelDisplayer(QWidget *parent)
 	loader(false),
 	m_width(600),
 	m_height(600),
-	render(qRgb(128, 128, 0)),
+	render(qRgb(0, 0, 0)),
 	m_camera_distance(5.f),
 	m_horizontalAngle(0.f),
 	m_verticalAngle(0.f),
-	m_mode(Rotate)
+	m_mode(Rotate),
+	m_frameCount(0)
 {
 	ui.setupUi(this);
 
@@ -47,11 +42,22 @@ ModelDisplayer::ModelDisplayer(QWidget *parent)
 	render.setWindowSize(m_width, m_height);
 }
 
+void SpanningScanline::ModelDisplayer::about()
+{
+	QMessageBox::about(this, tr("About Model Viewer"),
+		tr("<p>The <b>Model Viewer</b> example shows the result of "
+			"using Spanning Scanline algorithm to render a model on cpu.</p>"
+			"<p>For displaying a model, you can use <b>mouse</b> to rotate and scale it.</p>"
+			"<p>Author: <a href=\"https://github.com/amazingzhen\">AmazingZhen</a></p>"));
+}
+
 void ModelDisplayer::createActions()
 {
 	QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
+	fileMenu->addAction(tr("&Open..."), this, &ModelDisplayer::open);
 
-	QAction *openAct = fileMenu->addAction(tr("&Open..."), this, &ModelDisplayer::open);
+	QMenu *helpMenu = menuBar()->addMenu(tr("&Help"));
+	helpMenu->addAction(tr("&About"), this, &ModelDisplayer::about);
 }
 
 void ModelDisplayer::updateActions()
@@ -116,15 +122,7 @@ void SpanningScanline::ModelDisplayer::keyPressEvent(QKeyEvent *event)
 		m_horizontalAngle -= 3;
 		rotate_camera = true;
 		break;
-	case Qt::Key_Q:
-		render.switchPolygon(true);
-		break;
-	case Qt::Key_E:
-		render.switchPolygon(false);
-		break;
-	case Qt::Key_Space:
-		render.singlePolygon = !render.singlePolygon;
-		break;
+	
 	default:
 		specific_key_pressed = false;
 		break;

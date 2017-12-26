@@ -9,11 +9,6 @@
 using namespace std;
 
 namespace SpanningScanline {
-	enum State {
-		in,
-		out
-	};
-
 	struct Polygon {
 		unsigned int id;
 
@@ -22,8 +17,6 @@ namespace SpanningScanline {
 		int cross_y;	// The number of scanlines crossed by the polygon
 		
 		QRgb color;
-
-		State s;
 	};
 
 	struct Side {
@@ -31,44 +24,12 @@ namespace SpanningScanline {
 		float delta_x;		// dy / dx = k, delta_x = -1 / k
 		int cross_y;		// The number of scanlines crossed by the side
 		float x;				// the x value of point y_max
-		float z;			// the z value of point y_max
 
 		void print() {
 			cout << "polygon_id :" << polygon_id << endl;
 			cout << "delta_x :" << delta_x << endl;
 			cout << "cross_y :" << cross_y << endl;
 			cout << "x :" << x << endl;
-			cout << "z :" << z << endl << endl;
-		}
-	};
-
-	struct SidePair {
-		int polygon_id;
-
-		// 'left' side of polygon cross scanline
-		float x_l;			// x value of intersection
-		float dx_l;			// delta_x
-		float cross_y_l;	// cross_y
-
-		// 'right' side of polygon cross scanline
-		float x_r, dx_r, cross_y_r;
-
-		float z_l;			// z value of intersection
-		float dz_along_x;	// delta_z along x axis, dz / dx
-		float dz_along_y;	// delta_z along y axis, dz / dy
-
-		QRgb color;  // used for light
-
-		void print() {
-			cout << "x_l :"			<< x_l << endl;
-			cout << "dx_l :"		<< dx_l << endl;
-			cout << "cross_y_l :"	<< cross_y_l << endl;
-			cout << "x_r :"			<< x_r << endl;
-			cout << "dx_r :"		<< dx_r << endl;
-			cout << "cross_y_r :"	<< cross_y_r << endl;
-			cout << "z_l :"			<< z_l << endl;
-			cout << "dz_l_along_x :" << dz_along_x << endl;
-			cout << "dz_r_along_y :" << dz_along_y << endl << endl;
 		}
 	};
 
@@ -83,10 +44,6 @@ namespace SpanningScanline {
 		void setCameraPos(const QVector3D &pos);
 		void setModelviewMatrix(const QMatrix4x4 &m) { m_modelview = m; }
 		void setWindowSize(int width, int height);
-
-		int m_curPolygonId = 0;
-		bool singlePolygon = false;
-		void switchPolygon(bool up);
 
 	private:
 		// Initial data structure of scanline algorithm.
@@ -118,8 +75,8 @@ namespace SpanningScanline {
 		// Data structure of scanline algorithm.
 		QVector<Polygon> m_polygonTable;
 		QVector<QVector<Side>> m_sideTable;
-		QList<Side> m_activeSideList;
-		QRgb *m_frame_buffer;
+		QVector<Side> m_activeSideList;
+		QVector<QRgb> m_frame_buffer;
 
 		// Vertex data.
 		QVector<float> m_vertices;
@@ -133,6 +90,5 @@ namespace SpanningScanline {
 		QRect m_viewport;
 
 		QImage m_result;
-		int m_frameCount;
 	};
 }

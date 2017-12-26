@@ -2,6 +2,7 @@
 
 #include <QtWidgets/QMainWindow>
 #include <QImage>
+#include <QtWidgets>
 
 #include "ui_ModelDisplayer.h"
 
@@ -29,6 +30,7 @@ namespace SpanningScanline {
 
 	private slots:
 		void open();
+		void about();
 
 	private:
 		void createActions();
@@ -67,5 +69,8 @@ namespace SpanningScanline {
 		float m_horizontalAngle, m_verticalAngle;
 		InteractionMode m_mode;
 		float m_mousePressX, m_mousePressY;
+
+		int m_frameCount;
+		int m_time;
 	};
 }

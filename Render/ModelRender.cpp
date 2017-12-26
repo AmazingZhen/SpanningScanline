@@ -3,8 +3,9 @@
 SpanningScanline::ModelRender::ModelRender(QRgb backgroundColor) :
 	m_backgroundColor(backgroundColor),
 	m_max_z(100.f),
-	m_frameCount(0),
-	m_frame_buffer(0)
+	m_frame_buffer(0),
+	m_width(0),
+	m_height(0)
 {
 }
 
@@ -36,8 +37,6 @@ bool SpanningScanline::ModelRender::render()
 	}
 
 	saveRenderResult();
-	m_frameCount++;
-	printf("Render %d frame finish\n", m_frameCount);
 
 	isRendering = false;
 
@@ -62,31 +61,24 @@ void SpanningScanline::ModelRender::setWindowSize(int width, int height)
 	m_width = width;
 	m_height = height;
 
-	if (m_frame_buffer) {
-		delete m_frame_buffer;
-	}
-	m_frame_buffer = new QRgb[m_height * m_width];
+	m_sideTable = QVector<QVector<Side>>(height);
 
-	m_result = QImage(m_width, m_height, QImage::Format_RGB32);
+	m_frame_buffer = QVector<QRgb>(width * height);
+
+	m_result = QImage(width, height, QImage::Format_RGB32);
 
 	m_projection = QMatrix4x4();
-	m_projection.perspective(70.0, m_width / m_height, 0.1f, 100.f);
+	m_projection.perspective(70.0, width / height, 0.1f, 100.f);
 
-	m_viewport = QRect(0, 0, m_width, m_height);
+	m_viewport = QRect(0, 0, width, height);
 }
 
-void SpanningScanline::ModelRender::switchPolygon(bool up)
-{
-	m_curPolygonId += up ? 1 : -1;
-	m_curPolygonId += m_indices.size() / 3;
-	m_curPolygonId %= m_indices.size() / 3;
-}
-
-// TO DO ...
 bool SpanningScanline::ModelRender::initialPolygonTableAndSideTable()
 {
-	m_polygonTable = QVector<Polygon>();
-	m_sideTable = QVector<QVector<Side>>(m_height);
+	m_polygonTable.clear();
+	for (int i = 0; i < m_height; i++) {
+		m_sideTable[i].clear();
+	}
 
 	m_activeSideList.clear();
 
@@ -111,7 +103,7 @@ bool SpanningScanline::ModelRender::initialPolygonTableAndSideTable()
 			c_normal = getNormalFromBuffer(m_indices[i + 2]);
 
 			// Get color factor by normal * view
-			// polygon_pos = (a + b + c) / 3;
+			polygon_pos = (a + b + c) / 3;
 			view = (m_camera_pos - polygon_pos).normalized();
 			polygon_normal = ((a_normal + b_normal + c_normal) / 3).normalized();
 			factor = QVector3D::dotProduct(polygon_normal, view);
@@ -219,7 +211,7 @@ bool SpanningScanline::ModelRender::addSide(const QVector3D &a, const QVector3D 
 	int max_y = upper_vertex.y(), min_y = lower_vertex.y();
 	float x_of_max_y = upper_vertex.x(), x_of_min_y = lower_vertex.x();
 
-	if (max_y < 0) {  // the upper vertex out of screen bottom
+	if (max_y < 0 || min_y >= m_height - 1) {  // upper vertex out of screen bottom or lower vertex out of top
 		return false;
 	}
 
@@ -228,7 +220,6 @@ bool SpanningScanline::ModelRender::addSide(const QVector3D &a, const QVector3D 
 	side.delta_x = -(upper_vertex.x() - lower_vertex.x()) / (upper_vertex.y() - lower_vertex.y());
 	side.polygon_id = polygon_id;
 	side.x = upper_vertex.x();
-	side.z = upper_vertex.z();
 
 	// If the upper vertex out of screen top, we 'cut' this side
 	while (max_y >= m_height) {
@@ -244,6 +235,11 @@ bool SpanningScanline::ModelRender::addSide(const QVector3D &a, const QVector3D 
 
 void SpanningScanline::ModelRender::scanlineRender(int scanline)
 {
+	int a = 1;
+	if (scanline == m_height - 1) {
+		a = 0;
+	}
+
 	activateSides(scanline);
 	scan(scanline);
 	updateActiveSideList();
@@ -259,7 +255,7 @@ void SpanningScanline::ModelRender::initialFrameBuffer()
 
 bool SpanningScanline::ModelRender::activateSides(int scanline)
 {
-	for (const Side &s : m_sideTable[scanline]) if (!singlePolygon || s.polygon_id == m_curPolygonId) {
+	for (const Side &s : m_sideTable[scanline]) {
 		m_activeSideList.push_back(s);
 	}
 
@@ -274,17 +270,17 @@ void SpanningScanline::ModelRender::scan(int line)
 {
 	auto s_iter_left = m_activeSideList.begin();
 
-	QHash<int, Polygon> activePolygonHashmap;
+	QMap<int, Polygon> activePolygonMap;
 	while (s_iter_left != m_activeSideList.end() && s_iter_left->x < m_width) {
 		Side &s_left = *s_iter_left;
 
 		// Update activePolygonList
-		auto p_iter = activePolygonHashmap.find(s_left.polygon_id);
-		if (p_iter == activePolygonHashmap.end()) {
-			activePolygonHashmap[s_left.polygon_id] = m_polygonTable[s_left.polygon_id];
+		auto p_iter = activePolygonMap.find(s_left.polygon_id);
+		if (p_iter == activePolygonMap.end()) {
+			activePolygonMap[s_left.polygon_id] = m_polygonTable[s_left.polygon_id];
 		}
 		else {
-			activePolygonHashmap.erase(p_iter);
+			activePolygonMap.erase(p_iter);
 		}
 
 		auto s_iter_right = s_iter_left + 1;
@@ -293,12 +289,12 @@ void SpanningScanline::ModelRender::scan(int line)
 			Side &s_right = *s_iter_right;
 			QRgb color = qRgb(255, 255, 255);
 
-			if (activePolygonHashmap.size() > 1) {  // find closest polygon
+			if (activePolygonMap.size() > 1) {  // find closest polygon
 				float x = (s_left.x + s_right.x) / 2.f;
 				float min_z = m_max_z;
 				int closestPolygonId = -1;
 
-				for (auto &p : activePolygonHashmap) {
+				for (auto &p : activePolygonMap) {
 					float z = -(p.a * x + p.b * line + p.d) / p.c;
 					if (z < min_z) {
 						min_z = z;
@@ -309,8 +305,8 @@ void SpanningScanline::ModelRender::scan(int line)
 				if (closestPolygonId != -1) {
 					color = m_polygonTable[closestPolygonId].color;
 				}
-			} else if (!activePolygonHashmap.empty()) {
-				color = activePolygonHashmap.begin()->color;
+			} else if (!activePolygonMap.empty()) {
+				color = activePolygonMap.begin()->color;
 			}
 			else {
 				color = m_backgroundColor;
@@ -356,69 +352,10 @@ void SpanningScanline::ModelRender::drawLine(int x1, int x2, int y, QRgb color)
 	}
 }
 
-/*
-bool SpanningScanline::ModelRender::activateSidesPartlyOutOfScreen(const QVector3D &a, const QVector3D &b, const QVector3D &c, int polygon_id)
-{
-	activateSidePartlyOutOfScreen(a, b, polygon_id);
-	activateSidePartlyOutOfScreen(a, c, polygon_id);
-	activateSidePartlyOutOfScreen(b, c, polygon_id);
-
-	return true;
-}
-
-bool SpanningScanline::ModelRender::activateSidePartlyOutOfScreen(const QVector3D &a, const QVector3D &b, int polygon_id)
-{
-	if ((int)a.y() >= m_height && (int)b.y() >= m_height) {  // ignore side totally out of screen
-		return false;
-	}
-
-	if ((int)a.y() < 0 && (int)b.y() < 0) {  // ignore side totally out of screen
-		return false;
-	}
-
-	QVector3D upper_vertex, lower_vertex;
-	if (a.y() > b.y()) {
-		upper_vertex = a;
-		lower_vertex = b;
-	}
-	else {
-		upper_vertex = b;
-		lower_vertex = a;
-	}
-
-	int max_y = upper_vertex.y(), min_y = lower_vertex.y();
-	float x_of_max_y = upper_vertex.x(), x_of_min_y = lower_vertex.x();
-
-	Side side;
-	side.cross_y = max_y - min_y;
-	side.delta_x = -(upper_vertex.x() - lower_vertex.x()) / (upper_vertex.y() - lower_vertex.y());
-	side.polygon_id = polygon_id;
-	side.x = upper_vertex.x();
-	side.z = upper_vertex.z();
-
-	if (max_y >= m_height) {  // Activate it now
-		m_activeSideList.push_back(side);
-	}
-	else {  // If this side is in the screen, we still add it to table and activate it later
-		m_sideTable[max_y].push_back(side);
-	}
-
-	return true;
-}
-
-bool SpanningScanline::ModelRender::preprocessActiveSideList()
-{
-
-
-	return false;
-}
-
-*/
-
 void SpanningScanline::ModelRender::saveRenderResult()
 {
 	/*
-#pragma omp parallel for
+	#pragma omp parallel for
 	for (int r = 0; r < m_height; r++) {
 		for (int c = 0; c < m_width; c++) {
 			m_result.setPixel(c, m_height - 1 - r, m_frame_buffer[r][c]);
